@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border: 1px solid rgba(0, 0, 0, 0.125);
+        }
+        .password-field {
+            font-family: monospace;
+            letter-spacing: 0.2em;
+        }
+        .hidden-password {
+            filter: blur(4px);
+            transition: filter 0.3s;
+        }
+        .hidden-password:hover {
+            filter: none;
+        }
+        .strength-meter {
+            height: 5px;
+            margin-top: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <h1 class="text-center mb-4">🔒 Password Manager</h1>
+                
+                <!-- Login/Register Form -->
+                <div id="authSection" class="card mb-4">
+                    <div class="card-body">
+                        <h3 id="authTitle" class="card-title text-center">Login</h3>
+                        <form id="authForm">
+                            <div class="mb-3">
+                                <label for="masterPassword" class="form-label">Master Password</label>
+                                <input type="password" class="form-control" id="masterPassword" required>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary" id="authButton">Login</button>
+                            </div>
+                        </form>
+                        <div class="text-center mt-3">
+                            <small class="text-muted">First time? Register with your master password.</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dashboard -->
+                <div id="dashboardSection" style="display: none;">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3 class="card-title">My Credentials</h3>
+                                <div>
+                                    <button class="btn btn-success me-2" id="addCredentialBtn">➕ Add</button>
+                                    <button class="btn btn-secondary" id="exportBtn">📤 Export</button>
+                                    <button class="btn btn-outline-danger" id="logoutBtn">🚪 Logout</button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="searchInput" placeholder="Search by site or username...">
+                            </div>
+                            
+                            <div id="credentialsList">
+                                <!-- Credentials will be loaded here -->
+                                <div class="text-center py-5">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add/Edit Credential Modal -->
+        <div class="modal fade" id="credentialModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="credentialModalLabel">Add Credential</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="credentialForm">
+                            <input type="hidden" id="credentialId">
+                            <div class="mb-3">
+                                <label for="site" class="form-label">Site</label>
+                                <input type="text" class="form-control" id="site" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="password" required>
+                                    <button class="btn btn-outline-secondary" type="button" id="generatePasswordBtn">🎲</button>
+                                    <button class="btn btn-outline-secondary" type="button" id="togglePasswordVisibility">👁️</button>
+                                </div>
+                                <div class="strength-meter">
+                                    <div class="progress" style="height: 10px;">
+                                        <div id="passwordStrength" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <small class="text-muted">Password strength: <span id="strengthText">None</span></small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">Notes</label>
+                                <textarea class="form-control" id="notes" rows="3"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="saveCredentialBtn">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- View Password Modal -->
+        <div class="modal fade" id="viewPasswordModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">View Password</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Site</label>
+                            <div id="viewSite" class="form-control-plaintext"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <div id="viewUsername" class="form-control-plaintext"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <div class="input-group">
+                                <input type="text" id="viewPassword" class="form-control password-field" readonly>
+                                <button class="btn btn-outline-secondary" type="button" id="copyPasswordBtn">📋 Copy</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <div id="viewNotes" class="form-control-plaintext"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Delete Confirmation Modal -->
+        <div class="modal fade" id="deleteModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirm Delete</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete this credential?</p>
+                        <p class="text-danger">This action cannot be undone.</p>
+                        <input type="hidden" id="deleteCredentialId">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Password Manager - Local Storage Only | Educational Purpose</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        const API_BASE = '/api';
+        let credentials = [];
+        
+        // DOM Elements
+        const authSection = document.getElementById('authSection');
+        const dashboardSection = document.getElementById('dashboardSection');
+        const authForm = document.getElementById('authForm');
+        const authTitle = document.getElementById('authTitle');
+        const authButton = document.getElementById('authButton');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const addCredentialBtn = document.getElementById('addCredentialBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const searchInput = document.getElementById('searchInput');
+        const credentialsList = document.getElementById('credentialsList');
+        const credentialModal = new bootstrap.Modal(document.getElementById('credentialModal'));
+        const viewPasswordModal = new bootstrap.Modal(document.getElementById('viewPasswordModal'));
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            
+            // Event listeners
+            authForm.addEventListener('submit', handleAuth);
+            logoutBtn.addEventListener('click', logout);
+            addCredentialBtn.addEventListener('click', showAddCredentialForm);
+            exportBtn.addEventListener('click', exportData);
+            searchInput.addEventListener('input', filterCredentials);
+            
+            // Credential form events
+            document.getElementById('saveCredentialBtn').addEventListener('click', saveCredential);
+            document.getElementById('generatePasswordBtn').addEventListener('click', generatePassword);
+            document.getElementById('togglePasswordVisibility').addEventListener('click', togglePasswordVisibility);
+            document.getElementById('password').addEventListener('input', checkPasswordStrength);
+            document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDelete);
+            document.getElementById('copyPasswordBtn').addEventListener('click', copyPasswordToClipboard);
+        });
+        
+        // Authentication functions
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/credentials`);
+                if (response.ok) {
+                    showDashboard();
+                    loadCredentials();
+                } else {
+                    showAuth();
+                }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+                showAuth();
+            }
+        }
+        
+        function showAuth() {
+            authSection.style.display = 'block';
+            dashboardSection.style.display = 'none';
+            
+            // Check if user exists to determine if it's login or register
+            fetch(`${API_BASE}/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({master_password: ''})
+            }).then(response => {
+                if (response.status === 400) {
+                    authTitle.textContent = 'Register';
+                    authButton.textContent = 'Register';
+                } else {
+                    authTitle.textContent = 'Login';
+                    authButton.textContent = 'Login';
+                }
+            }).catch(() => {
+                authTitle.textContent = 'Login/Register';
+                authButton.textContent = 'Submit';
+            });
+        }
+        
+        function showDashboard() {
+            authSection.style.display = 'none';
+            dashboardSection.style.display = 'block';
+        }
+        
+        async function handleAuth(e) {
+            e.preventDefault();
+            const masterPassword = document.getElementById('masterPassword').value;
+            
+            if (!masterPassword) {
+                alert('Please enter a master password');
+                return;
+            }
+            
+            // Determine if we're registering or logging in
+            const isRegister = authTitle.textContent === 'Register';
+            const endpoint = isRegister ? `${API_BASE}/register` : `${API_BASE}/login`;
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({master_password: masterPassword})
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showDashboard();
+                    loadCredentials();
+                    document.getElementById('masterPassword').value = '';
+                } else {
+                    alert(data.error || 'Authentication failed');
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                alert('An error occurred during authentication');
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/logout`, {method: 'POST'});
+                showAuth();
+                credentials = [];
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+        
+        // Credential functions
+        async function loadCredentials() {
+            try {
+                const response = await fetch(`${API_BASE}/credentials`);
+                if (response.ok) {
+                    credentials = await response.json();
+                    renderCredentials(credentials);
+                } else {
+                    throw new Error('Failed to load credentials');
+                }
+            } catch (error) {
+                console.error('Error loading credentials:', error);
+                credentialsList.innerHTML = '<div class="alert alert-danger">Failed to load credentials</div>';
+            }
+        }
+        
+        function renderCredentials(credentialsToShow) {
+            if (credentialsToShow.length === 0) {
+                credentialsList.innerHTML = `
+                    <div class="text-center py-5">
+                        <h5>No credentials found</h5>
+                        <p class="text-muted">Add your first credential using the "Add" button</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Site</th>
+                                <th>Username</th>
+                                <th>Password</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            credentialsToShow.forEach(cred => {
+                html += `
+                    <tr>
+                        <td>${escapeHtml(cred.site)}</td>
+                        <td>${escapeHtml(cred.username)}</td>
+                        <td>
+                            <span class="hidden-password">••••••</span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary view-btn" data-id="${cred.id}">View</button>
+                            <button class="btn btn-sm btn-outline-secondary edit-btn" data-id="${cred.id}">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${cred.id}">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            credentialsList.innerHTML = html;
+            
+            // Add event listeners to action buttons
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', () => viewCredential(btn.dataset.id));
+            });
+            
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', () => editCredential(btn.dataset.id));
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => showDeleteConfirmation(btn.dataset.id));
+            });
+        }
+        
+        function filterCredentials() {
+            const searchTerm = searchInput.value.toLowerCase();
+            if (!searchTerm) {
+                renderCredentials(credentials);
+                return;
+            }
+            
+            const filtered = credentials.filter(cred => 
+                cred.site.toLowerCase().includes(searchTerm) || 
+                cred.username.toLowerCase().includes(searchTerm)
+            );
+            
+            renderCredentials(filtered);
+        }
+        
+        function showAddCredentialForm() {
+            document.getElementById('credentialModalLabel').textContent = 'Add Credential';
+            document.getElementById('credentialForm').reset();
+            document.getElementById('credentialId').value = '';
+            document.getElementById('passwordStrength').style.width = '0%';
+            document.getElementById('strengthText').textContent = 'None';
+            credentialModal.show();
+        }
+        
+        async function viewCredential(id) {
+            try {
+                const response = await fetch(`${API_BASE}/credentials/${id}`);
+                if (response.ok) {
+                    const credential = await response.json();
+                    
+                    document.getElementById('viewSite').textContent = credential.site;
+                    document.getElementById('viewUsername').textContent = credential.username;
+                    document.getElementById('viewPassword').value = credential.password;
+                    document.getElementById('viewNotes').textContent = credential.notes || 'No notes';
+                    
+                    viewPasswordModal.show();
+                } else {
+                    throw new Error('Failed to load credential');
+                }
+            } catch (error) {
+                console.error('Error viewing credential:', error);
+                alert('Failed to load credential details');
+            }
+        }
+        
+        function editCredential(id) {
+            const credential = credentials.find(c => c.id == id);
+            if (!credential) return;
+            
+            document.getElementById('credentialModalLabel').textContent = 'Edit Credential';
+            document.getElementById('credentialId').value = credential.id;
+            document.getElementById('site').value = credential.site;
+            document.getElementById('username').value = credential.username;
+            document.getElementById('password').value = ''; // Don't pre-fill password
+            document.getElementById('notes').value = credential.notes || '';
+            
+            document.getElementById('passwordStrength').style.width = '0%';
+            document.getElementById('strengthText').textContent = 'None';
+            
+            credentialModal.show();
+        }
+        
+        async function saveCredential() {
+            const id = document.getElementById('credentialId').value;
+            const site = document.getElementById('site').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const notes = document.getElementById('notes').value;
+            
+            if (!site || !username || !password) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            const data = {site, username, password, notes};
+            const isUpdate = !!id;
+            const url = isUpdate ? `${API_BASE}/credentials/${id}` : `${API_BASE}/credentials`;
+            const method = isUpdate ? 'PUT' : 'POST';
+            
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    credentialModal.hide();
+                    loadCredentials(); // Refresh the list
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to save credential');
+                }
+            } catch (error) {
+                console.error('Error saving credential:', error);
+                alert('An error occurred while saving the credential');
+            }
+        }
+        
+        function showDeleteConfirmation(id) {
+            document.getElementById('deleteCredentialId').value = id;
+            deleteModal.show();
+        }
+        
+        async function confirmDelete() {
+            const id = document.getElementById('deleteCredentialId').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/credentials/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    deleteModal.hide();
+                    loadCredentials(); // Refresh the list
+                } else {
+                    throw new Error('Failed to delete credential');
+                }
+            } catch (error) {
+                console.error('Error deleting credential:', error);
+                alert('Failed to delete credential');
+            }
+        }
+        
+        // Utility functions
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        function generatePassword() {
+            const length = 16;
+            const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
+            let password = "";
+            for (let i = 0; i < length; i++) {
+                password += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            document.getElementById('password').value = password;
+            checkPasswordStrength();
+        }
+        
+        function togglePasswordVisibility() {
+            const passwordField = document.getElementById('password');
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+        }
+        
+        function checkPasswordStrength() {
+            const password = document.getElementById('password').value;
+            const strengthBar = document.getElementById('passwordStrength');
+            const strengthText = document.getElementById('strengthText');
+            
+            if (!password) {
+                strengthBar.style.width = '0%';
+                strengthText.textContent = 'None';
+                strengthBar.className = 'progress-bar';
+                return;
+            }
+            
+            // Simple password strength calculation
+            let strength = 0;
+            if (password.length >= 8) strength += 25;
+            if (/[a-z]/.test(password)) strength += 15;
+            if (/[A-Z]/.test(password)) strength += 15;
+            if (/[0-9]/.test(password)) strength += 15;
+            if (/[^A-Za-z0-9]/.test(password)) strength += 30;
+            
+            strengthBar.style.width = strength + '%';
+            
+            if (strength < 40) {
+                strengthText.textContent = 'Weak';
+                strengthBar.className = 'progress-bar bg-danger';
+            } else if (strength < 70) {
+                strengthText.textContent = 'Medium';
+                strengthBar.className = 'progress-bar bg-warning';
+            } else {
+                strengthText.textContent = 'Strong';
+                strengthBar.className = 'progress-bar bg-success';
+            }
+        }
+        
+        async function exportData() {
+            try {
+                const response = await fetch(`${API_BASE}/export`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'password_manager_export.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else {
+                    throw new Error('Failed to export data');
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Failed to export data');
+            }
+        }
+        
+        function copyPasswordToClipboard() {
+            const passwordField = document.getElementById('viewPassword');
+            passwordField.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const copyBtn = document.getElementById('copyPasswordBtn');
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = '✅ Copied!';
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
